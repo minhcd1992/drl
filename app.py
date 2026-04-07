@@ -3,130 +3,123 @@ import streamlit.components.v1 as components
 import google.generativeai as genai
 from playwright.sync_api import sync_playwright
 import time
-import os
-
-# --- MẸO CHO STREAMLIT CLOUD ---
-# Lệnh này ép Streamlit Cloud tải trình duyệt ảo về để Playwright có thể chạy
-os.system("playwright install chromium")
 
 # --- CẤU HÌNH TRANG ---
 st.set_page_config(page_title="Radar Điểm Rèn Luyện HCMUE", page_icon="⚡", layout="wide")
 
 # --- CẤU HÌNH GEMINI API ---
-# Bạn cần lấy API Key miễn phí từ Google AI Studio và điền vào đây
-# Gợi ý: Trên Streamlit Cloud, nên lưu API_KEY vào phần Settings -> Secrets
 API_KEY = st.secrets.get("GEMINI_API_KEY", "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY_NẾU_CHẠY_LOCAL")
 genai.configure(api_key=API_KEY)
 
 def analyze_post_with_ai(text):
-    """Hàm gọi Gemini AI để nhận diện bài viết có điểm rèn luyện không"""
+    """Hàm gọi Gemini AI để nhận diện bài viết"""
     if not API_KEY or API_KEY == "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY_NẾU_CHẠY_LOCAL":
-         return True, "Chưa cấu hình API Key, hiển thị tạm."
+         return False, "Chưa cấu hình API Key"
          
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"""
-        Bạn là trợ lý cho sinh viên. Hãy đọc bài đăng Facebook sau đây của tổ chức Đoàn/Hội.
-        Xác định xem bài viết này CÓ PHẢI là một sự kiện, hội thảo, cuộc thi, hoặc hoạt động tình nguyện mà sinh viên tham gia có thể được cộng "điểm rèn luyện" hay không?
-        
-        Trả lời theo định dạng sau (chỉ trả lời 2 dòng, không thêm gì khác):
+        Đọc đoạn văn bản sau cào từ Facebook Đoàn/Hội.
+        Đoạn này CÓ PHẢI là một sự kiện/thông báo tuyển tình nguyện viên/hội thảo mà sinh viên tham gia có thể lấy điểm rèn luyện không?
+        Chỉ trả lời 2 dòng:
         Dòng 1: ĐÚNG hoặc SAI
-        Dòng 2: Tóm tắt tên sự kiện đó trong 1 câu ngắn gọn.
+        Dòng 2: Tóm tắt tên sự kiện (nếu ĐÚNG), hoặc ghi 'Bỏ qua' (nếu SAI).
         
-        Nội dung bài viết:
+        Nội dung:
         "{text[:1000]}"
         """
         response = model.generate_content(prompt)
         result = response.text.strip().split('\n')
         
         is_drl = "ĐÚNG" in result[0].upper()
-        title = result[1] if len(result) > 1 else text[:50] + "..."
+        title = result[1] if len(result) > 1 else "Sự kiện chưa có tên"
         return is_drl, title
     except Exception as e:
-        return False, "Lỗi AI"
+        return False, f"Lỗi AI: {e}"
 
 def fetch_facebook_posts(page_url):
-    """Hàm cào bài viết và LINK bằng Playwright"""
+    """Hàm cào bài viết và LINK bằng Playwright (Bản chống Login Wall)"""
     posts_data = []
-    mobile_url = page_url.replace("www.facebook.com", "m.facebook.com")
+    # Thử dùng www thay vì m.facebook vì bản web đôi khi cho phép cuộn xem bài trước khi ép đăng nhập
     
     with sync_playwright() as p:
-        # ÉP XÀI CHROMIUM CỦA HỆ THỐNG
         browser = p.chromium.launch(
-            executable_path="/usr/bin/chromium", # Chỉ định đường dẫn tới Chromium cài từ packages.txt
+            executable_path="/usr/bin/chromium", 
             headless=True,
             args=[
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-gpu"
+                "--disable-gpu",
+                "--disable-blink-features=AutomationControlled" # Giấu thân phận bot
             ]
         )
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         page = context.new_page()
         
+        # Bật biến lưu raw text để debug
+        raw_debug_text = ""
+        
         try:
-            page.goto(mobile_url, timeout=60000)
-            page.wait_for_timeout(3000) # Chờ FB load JS
+            page.goto(page_url, timeout=60000)
+            page.wait_for_timeout(3000) 
             
-            # Cuộn xuống một chút để FB tải thêm bài
-            page.evaluate("window.scrollBy(0, 2000)")
-            page.wait_for_timeout(2000)
+            # Cố gắng tắt popup đăng nhập bằng phím Escape
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(1000)
+            
+            # Cuộn xuống để tải bài
+            page.evaluate("window.scrollBy(0, 1500)")
+            page.wait_for_timeout(3000)
 
-            # Tìm các thẻ chứa bài viết (Trên m.facebook, thường nằm trong <article> hoặc div có data-ft)
-            # Ở đây ta bắt các thẻ a có chứa link '/story.php' hoặc '/posts/' để tóm link
-            links = page.locator("a[href*='/story.php'], a[href*='/posts/'], a[href*='/photos/']").all()
+            # LƯU LẠI TOÀN BỘ TEXT MÀ BOT NHÌN THẤY ĐỂ DEBUG
+            raw_debug_text = page.locator("body").inner_text()
+
+            # Lấy tất cả các thẻ có chứa link bài viết
+            links = page.locator("a[href*='/posts/'], a[href*='/photos/']").all()
             
-            # Lấy tối đa 5 link bài mới nhất để tránh AI bị quá tải
             seen_texts = set()
-            for link in links[:15]:
+            for link in links[:20]:
                 href = link.get_attribute("href")
                 
-                # Sửa link mobile thành link desktop cho sinh viên dễ xem
-                if href and href.startswith("/"):
-                    full_link = "https://www.facebook.com" + href
-                else:
-                    full_link = href
+                # Tìm element cha bọc ngoài chứa text nội dung (đi lên 5-6 cấp tùy layout Facebook)
+                parent_element = link.locator("xpath=../../../../..") 
+                try:
+                    text_content = parent_element.inner_text().strip()
+                except:
+                    continue
                 
-                # Lấy nội dung text của thẻ cha chứa link đó
-                parent_element = link.locator("xpath=..")
-                text_content = parent_element.inner_text().strip()
-                
-                if text_content and len(text_content) > 50 and text_content not in seen_texts:
+                if text_content and len(text_content) > 100 and text_content not in seen_texts:
                     seen_texts.add(text_content)
+                    full_link = href if href.startswith("http") else "https://www.facebook.com" + href
                     posts_data.append({
                         "page_url": page_url,
                         "text": text_content,
-                        "link": full_link
+                        "link": full_link.split('?')[0] # Cắt bỏ phần tracking rườm rà
                     })
                 
-                if len(posts_data) >= 3: # Chỉ lấy 3 bài mới nhất mỗi trang
+                if len(posts_data) >= 3:
                     break
                     
         except Exception as e:
-            st.error(f"Lỗi khi quét {page_url}: {e}")
+            raw_debug_text = f"Lỗi Scraping: {str(e)}"
         finally:
             browser.close()
             
-    return posts_data
+    return posts_data, raw_debug_text
 
 # --- GIAO DIỆN CHÍNH ---
 st.title("⚡ TRUNG TÂM KIỂM SOÁT ĐIỂM RÈN LUYỆN")
 
 tab1, tab2 = st.tabs(["📡 Radar Quét Sự Kiện", "🎯 Bảng Theo Dõi Cá Nhân"])
 
-# ==========================================
-# TAB 1: RADAR QUÉT SỰ KIỆN (Dùng Python)
-# ==========================================
 with tab1:
     st.info("Radar sử dụng AI Gemini để đọc hiểu và lọc các sự kiện có điểm rèn luyện.")
-    
-    # Dòng ghi chú nhắc nhở tinh tế
-    st.markdown("💡 **Mẹo nhỏ:** Bạn hãy lưu sẵn các link Fanpage quan tâm vào app Ghi chú (Note) hoặc Zalo Truyền file, khi nào cần quét điểm chỉ việc Copy & Paste vào đây cho lẹ nhé!")
+    st.markdown("💡 **Mẹo nhỏ:** Lưu sẵn các link Fanpage vào app Ghi chú, khi nào cần quét điểm chỉ việc Copy & Paste vào đây!")
     
     user_urls = st.text_area("Dán link Fanpage (mỗi link 1 dòng):", 
-                             "https://www.facebook.com/DoanHoiVatLyHCMUE\nhttps://www.facebook.com/TuoiTreHCMUE", 
+                             "https://www.facebook.com/youth.hcmue\nhttps://www.facebook.com/phongctct.hcmue",
                              height=100)
     
     if st.button("🚀 Kích hoạt Radar", type="primary"):
@@ -135,27 +128,38 @@ with tab1:
         if not urls:
             st.warning("Vui lòng nhập link!")
         else:
-            with st.spinner("Đang điều khiển trình duyệt ẩn danh cào dữ liệu & gọi AI phân tích. Quá trình này mất khoảng 15-30 giây..."):
+            with st.spinner("Đang cho bot cào dữ liệu & gọi AI. Vui lòng chờ..."):
                 all_found_posts = []
+                debug_logs = {}
                 
-                # Quét từng page
                 for url in urls:
-                    raw_posts = fetch_facebook_posts(url)
+                    raw_posts, debug_text = fetch_facebook_posts(url)
+                    debug_logs[url] = {"raw_text": debug_text, "posts_found": len(raw_posts)}
+                    
                     for post in raw_posts:
-                        # Gửi cho AI check
                         is_drl, title = analyze_post_with_ai(post["text"])
                         if is_drl:
                             post["title"] = title
                             all_found_posts.append(post)
                 
-                st.success(f"Ting ting! Tìm thấy {len(all_found_posts)} sự kiện nóng hổi!")
-                
-                # Hiển thị kết quả có LINK THẬT
-                for idx, post in enumerate(all_found_posts):
-                    with st.container(border=True):
-                        st.subheader(f"🔥 {post['title']}")
-                        st.write(post['text'][:200] + "...")
-                        st.link_button("Đến bài viết gốc trên Facebook ➡️", post['link'])
+                # --- PHẦN DEBUG MỚI THÊM VÀO ---
+                with st.expander("🛠️ Chẩn đoán Bot (Bấm vào để xem Bot thấy gì)"):
+                    for url, log in debug_logs.items():
+                        st.markdown(f"**URL:** {url}")
+                        st.markdown(f"**Số block bài viết bắt được:** {log['posts_found']}")
+                        st.text_area("Text thô mà Bot đọc được từ trang này:", log['raw_text'][:2000] + "...\n(Đã cắt bớt)", height=150)
+                # -------------------------------
+
+                if len(all_found_posts) > 0:
+                    st.success(f"Ting ting! Tìm thấy {len(all_found_posts)} sự kiện nóng hổi!")
+                    for idx, post in enumerate(all_found_posts):
+                        with st.container(border=True):
+                            st.subheader(f"🔥 {post['title']}")
+                            st.write(post['text'][:250] + "...")
+                            st.link_button("Đến bài viết gốc trên Facebook ➡️", post['link'])
+                else:
+                    st.warning("Ting ting! Tìm thấy 0 sự kiện nóng hổi! Vui lòng kiểm tra mục 'Chẩn đoán Bot' ở trên.")
+
 with tab2:
     try:
         with open("tracker.html", "r", encoding="utf-8") as f:
