@@ -1,20 +1,22 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
-from playwright.sync_api import sync_playwright
+from apify_client import ApifyClient
 import time
 
 # --- CẤU HÌNH TRANG ---
 st.set_page_config(page_title="Radar Điểm Rèn Luyện HCMUE", page_icon="⚡", layout="wide")
 
-# --- CẤU HÌNH GEMINI API ---
-API_KEY = st.secrets.get("GEMINI_API_KEY", "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY_NẾU_CHẠY_LOCAL")
-genai.configure(api_key=API_KEY)
+# --- LẤY API KEY TỪ SECRETS ---
+GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
+APIFY_TOKEN = st.secrets.get("APIFY_TOKEN", "")
+
+genai.configure(api_key=GEMINI_KEY)
 
 def analyze_post_with_ai(text):
     """Hàm gọi Gemini AI để nhận diện bài viết"""
-    if not API_KEY or API_KEY == "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY_NẾU_CHẠY_LOCAL":
-         return False, "Chưa cấu hình API Key"
+    if not GEMINI_KEY:
+         return False, "Chưa cấu hình Gemini API Key"
          
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
@@ -38,72 +40,35 @@ def analyze_post_with_ai(text):
         return False, f"Lỗi AI: {e}"
 
 def fetch_facebook_posts(page_url):
-    """Hàm cào bài viết bằng Vũ khí tối thượng: mbasic.facebook.com"""
-    posts_data = []
-    # Biến link xịn thành link "cục gạch"
-    mobile_url = page_url.replace("www.facebook.com", "mbasic.facebook.com")
-    
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            executable_path="/usr/bin/chromium", 
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu"
-            ]
-        )
-        # TẮT HOÀN TOÀN JAVASCRIPT ĐỂ FB KHÔNG CHẠY ĐƯỢC CODE THEO DÕI BOT
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
-            java_script_enabled=False 
-        )
-        page = context.new_page()
-        
-        raw_debug_text = ""
-        
-        try:
-            # Truy cập bản cục gạch (load cực nhanh vì không có hiệu ứng gì)
-            page.goto(mobile_url, timeout=30000)
-            
-            # LƯU TEXT DEBUG
-            raw_debug_text = page.locator("body").inner_text()
+    """Hàm cào bài viết bằng Apify API (Qua mặt mọi lớp chặn của FB)"""
+    if not APIFY_TOKEN:
+        return [], "Chưa cấu hình APIFY_TOKEN"
 
-            # Trên mbasic, link trỏ vào bài viết chi tiết thường có chữ "story.php"
-            links = page.locator("a[href*='/story.php?']").all()
-            
-            seen_texts = set()
-            for link in links[:15]:
-                href = link.get_attribute("href")
-                
-                # Tìm element cha bọc ngoài chứa text nội dung (trên mbasic cấu trúc rất nông, lùi 3 cấp là đủ)
-                parent_element = link.locator("xpath=../../..") 
-                try:
-                    text_content = parent_element.inner_text().strip()
-                except:
-                    continue
-                
-                if text_content and len(text_content) > 50 and text_content not in seen_texts:
-                    seen_texts.add(text_content)
-                    
-                    # Trả lại link dạng "www" để sinh viên bấm vào xem cho đẹp
-                    full_link = "https://www.facebook.com" + href.replace("mbasic.facebook.com", "")
-                    
-                    posts_data.append({
-                        "page_url": page_url,
-                        "text": text_content,
-                        "link": full_link
-                    })
-                
-                if len(posts_data) >= 3:
-                    break
-                    
-        except Exception as e:
-            raw_debug_text = f"Lỗi Scraping: {str(e)}"
-        finally:
-            browser.close()
-            
-    return posts_data, raw_debug_text
+    client = ApifyClient(APIFY_TOKEN)
+    posts_data = []
+    
+    # Cấu hình lệnh cho con Bot Facebook Posts Scraper của Apify
+    run_input = {
+        "startUrls": [{"url": page_url}],
+        "resultsLimit": 3, # Chỉ lấy 3 bài mới nhất mỗi trang cho nhanh
+    }
+
+    try:
+        # Gọi con bot "apify/facebook-posts-scraper"
+        run = client.actor("apify/facebook-posts-scraper").call(run_input=run_input)
+        
+        # Rút trích dữ liệu nó cào được
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            if item.get("text"):
+                posts_data.append({
+                    "page_url": page_url,
+                    "text": item.get("text"),
+                    "link": item.get("url")
+                })
+        
+        return posts_data, "Apify quét thành công!"
+    except Exception as e:
+        return [], f"Lỗi Apify: {str(e)}"
 
 # --- GIAO DIỆN CHÍNH ---
 st.title("⚡ TRUNG TÂM KIỂM SOÁT ĐIỂM RÈN LUYỆN")
@@ -111,7 +76,7 @@ st.title("⚡ TRUNG TÂM KIỂM SOÁT ĐIỂM RÈN LUYỆN")
 tab1, tab2 = st.tabs(["📡 Radar Quét Sự Kiện", "🎯 Bảng Theo Dõi Cá Nhân"])
 
 with tab1:
-    st.info("Radar sử dụng AI Gemini để đọc hiểu và lọc các sự kiện có điểm rèn luyện.")
+    st.info("Radar sử dụng AI Gemini và nền tảng Apify để đọc hiểu các sự kiện có điểm rèn luyện.")
     st.markdown("💡 **Mẹo nhỏ:** Lưu sẵn các link Fanpage vào app Ghi chú, khi nào cần quét điểm chỉ việc Copy & Paste vào đây!")
     
     user_urls = st.text_area("Dán link Fanpage (mỗi link 1 dòng):", 
@@ -124,13 +89,14 @@ with tab1:
         if not urls:
             st.warning("Vui lòng nhập link!")
         else:
-            with st.spinner("Đang cho bot cào dữ liệu & gọi AI. Vui lòng chờ..."):
+            # Quá trình này Apify sẽ thuê Proxy dân cư để cào nên mất khoảng 30s - 1 phút
+            with st.spinner("Đang phái Bot Apify đi thu thập tin tức & gọi AI phân tích. Quá trình này mất khoảng 30s - 1 phút..."):
                 all_found_posts = []
                 debug_logs = {}
                 
                 for url in urls:
                     raw_posts, debug_text = fetch_facebook_posts(url)
-                    debug_logs[url] = {"raw_text": debug_text, "posts_found": len(raw_posts)}
+                    debug_logs[url] = {"log": debug_text, "posts_found": len(raw_posts)}
                     
                     for post in raw_posts:
                         is_drl, title = analyze_post_with_ai(post["text"])
@@ -138,20 +104,13 @@ with tab1:
                             post["title"] = title
                             all_found_posts.append(post)
                 
-                # --- PHẦN DEBUG MỚI THÊM VÀO ---
-                with st.expander("🛠️ Chẩn đoán Bot (Bấm vào để xem Bot thấy gì)"):
+                # Bảng Debug
+                with st.expander("🛠️ Chẩn đoán Bot (Bấm vào để xem Bot làm việc)"):
                     for url, log in debug_logs.items():
                         st.markdown(f"**URL:** {url}")
-                        st.markdown(f"**Số block bài viết bắt được:** {log['posts_found']}")
-                        
-                        # THÊM key=url VÀO CUỐI DÒNG NÀY ĐỂ FIX LỖI
-                        st.text_area(
-                            "Text thô mà Bot đọc được từ trang này:", 
-                            log['raw_text'][:2000] + "...\n(Đã cắt bớt)", 
-                            height=150, 
-                            key=url  # <--- Bùa hộ mệnh ở đây
-                        )
-                # -------------------------------
+                        st.markdown(f"**Số bài viết bắt được:** {log['posts_found']}")
+                        st.markdown(f"**Trạng thái:** {log['log']}")
+                        st.markdown("---")
 
                 if len(all_found_posts) > 0:
                     st.success(f"Ting ting! Tìm thấy {len(all_found_posts)} sự kiện nóng hổi!")
@@ -159,9 +118,9 @@ with tab1:
                         with st.container(border=True):
                             st.subheader(f"🔥 {post['title']}")
                             st.write(post['text'][:250] + "...")
-                            st.link_button("Đến bài viết gốc trên Facebook ➡️", post['link'])
+                            st.link_button("Đến bài đăng gốc ➡️", post['link'])
                 else:
-                    st.warning("Ting ting! Tìm thấy 0 sự kiện nóng hổi! Vui lòng kiểm tra mục 'Chẩn đoán Bot' ở trên.")
+                    st.warning("Tìm thấy 0 sự kiện! (Hoặc Fanpage chưa có sự kiện mới, hoặc cấu hình bị lỗi).")
 
 with tab2:
     try:
