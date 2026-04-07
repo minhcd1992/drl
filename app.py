@@ -48,13 +48,17 @@ def analyze_post_with_ai(text):
 def fetch_facebook_posts(page_url):
     """Hàm cào bài viết và LINK bằng Playwright"""
     posts_data = []
-    
-    # Mẹo: Dùng m.facebook.com (giao diện mobile) dễ cào và ít bị chặn hơn www
     mobile_url = page_url.replace("www.facebook.com", "m.facebook.com")
     
     with sync_playwright() as p:
-        # Chạy ẩn danh, không mở UI
-        browser = p.chromium.launch(headless=True)
+        # THÊM ARGS ĐỂ CHROMIUM CÓ THỂ CHẠY TRONG DOCKER CỦA STREAMLIT
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage"
+            ]
+        )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
         )
