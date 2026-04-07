@@ -45,14 +45,13 @@ def analyze_post_with_ai(text):
         return False, "Lỗi AI", f"Lỗi gọi Gemini API: {str(e)}"
 
 def fetch_facebook_posts(page_url, days_limit=2):
-    """Hàm cào bài viết bằng Apify và lọc theo thời gian"""
+    """Hàm cào bài viết bằng Apify và lọc theo thời gian (Bản Fix Lỗi Ngày)"""
     if not APIFY_TOKEN:
         return [], "CHƯA CẤU HÌNH APIFY_TOKEN TRONG SECRETS!"
 
     client = ApifyClient(APIFY_TOKEN)
     posts_data = []
     
-    # Nâng lên 15 bài để quét sâu hơn
     run_input = {
         "startUrls": [{"url": page_url}],
         "resultsLimit": 15,
@@ -61,36 +60,48 @@ def fetch_facebook_posts(page_url, days_limit=2):
     try:
         run = client.actor("apify/facebook-posts-scraper").call(run_input=run_input)
         
-        # Tính toán mốc thời gian cắt (Cutoff): Hiện tại trừ đi số ngày
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_limit)
+        raw_post_count = 0 # Đếm xem Apify cào được tổng cộng bao nhiêu bài thô
         
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            raw_post_count += 1
             text = item.get("text")
-            date_str = item.get("date") # Apify thường trả về dạng "2026-04-07T10:00:00.000Z"
             
-            if text and date_str:
-                try:
-                    # Chuyển đổi chuỗi thời gian của Facebook thành định dạng Date của Python
-                    post_date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-                    
-                    # Chỉ lấy bài đăng MỚI HƠN mốc cutoff (ví dụ: trong 2 ngày qua)
-                    if post_date >= cutoff_date:
+            # Tuyệt chiêu: Bắt mọi thể loại key lưu ngày tháng của Apify
+            date_raw = item.get("time") or item.get("date") or item.get("createdAt")
+            
+            if text:
+                if date_raw:
+                    try:
+                        # Đổi chuỗi ngày của Apify thành dạng Date của Python
+                        post_date = datetime.fromisoformat(str(date_raw).replace("Z", "+00:00"))
+                        
+                        # So sánh: Nếu bài đăng nằm trong khoảng X ngày qua
+                        if post_date >= cutoff_date:
+                            posts_data.append({
+                                "page_url": page_url,
+                                "text": text,
+                                "link": item.get("url"),
+                                "date": post_date.strftime("%d/%m/%Y")
+                            })
+                    except Exception:
+                        # Parse lỗi thì cứ lấy vào để không mất cơ hội của sinh viên
                         posts_data.append({
                             "page_url": page_url,
                             "text": text,
                             "link": item.get("url"),
-                            "date": post_date.strftime("%d/%m/%Y")
+                            "date": "Không rõ ngày"
                         })
-                except Exception:
-                    # Nếu lỗi parse ngày thì cứ lấy vào để không bị sót
+                else:
+                    # Nếu Apify không lấy được ngày thì cũng lấy bài luôn
                     posts_data.append({
                         "page_url": page_url,
                         "text": text,
                         "link": item.get("url"),
-                        "date": "Không rõ"
+                        "date": "Không rõ ngày"
                     })
                     
-        return posts_data, f"Apify đã lọc được {len(posts_data)} bài đăng trong {days_limit} ngày qua."
+        return posts_data, f"Apify cào thô {raw_post_count} bài -> Lọc được {len(posts_data)} bài mới!"
     except Exception as e:
         return [], f"Lỗi Apify: {str(e)}"
 
