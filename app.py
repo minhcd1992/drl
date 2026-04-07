@@ -38,9 +38,10 @@ def analyze_post_with_ai(text):
         return False, f"Lỗi AI: {e}"
 
 def fetch_facebook_posts(page_url):
-    """Hàm cào bài viết và LINK bằng Playwright (Bản chống Login Wall)"""
+    """Hàm cào bài viết bằng Vũ khí tối thượng: mbasic.facebook.com"""
     posts_data = []
-    # Thử dùng www thay vì m.facebook vì bản web đôi khi cho phép cuộn xem bài trước khi ép đăng nhập
+    # Biến link xịn thành link "cục gạch"
+    mobile_url = page_url.replace("www.facebook.com", "mbasic.facebook.com")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -49,54 +50,49 @@ def fetch_facebook_posts(page_url):
             args=[
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--disable-blink-features=AutomationControlled" # Giấu thân phận bot
+                "--disable-gpu"
             ]
         )
+        # TẮT HOÀN TOÀN JAVASCRIPT ĐỂ FB KHÔNG CHẠY ĐƯỢC CODE THEO DÕI BOT
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+            java_script_enabled=False 
         )
         page = context.new_page()
         
-        # Bật biến lưu raw text để debug
         raw_debug_text = ""
         
         try:
-            page.goto(page_url, timeout=60000)
-            page.wait_for_timeout(3000) 
+            # Truy cập bản cục gạch (load cực nhanh vì không có hiệu ứng gì)
+            page.goto(mobile_url, timeout=30000)
             
-            # Cố gắng tắt popup đăng nhập bằng phím Escape
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(1000)
-            
-            # Cuộn xuống để tải bài
-            page.evaluate("window.scrollBy(0, 1500)")
-            page.wait_for_timeout(3000)
-
-            # LƯU LẠI TOÀN BỘ TEXT MÀ BOT NHÌN THẤY ĐỂ DEBUG
+            # LƯU TEXT DEBUG
             raw_debug_text = page.locator("body").inner_text()
 
-            # Lấy tất cả các thẻ có chứa link bài viết
-            links = page.locator("a[href*='/posts/'], a[href*='/photos/']").all()
+            # Trên mbasic, link trỏ vào bài viết chi tiết thường có chữ "story.php"
+            links = page.locator("a[href*='/story.php?']").all()
             
             seen_texts = set()
-            for link in links[:20]:
+            for link in links[:15]:
                 href = link.get_attribute("href")
                 
-                # Tìm element cha bọc ngoài chứa text nội dung (đi lên 5-6 cấp tùy layout Facebook)
-                parent_element = link.locator("xpath=../../../../..") 
+                # Tìm element cha bọc ngoài chứa text nội dung (trên mbasic cấu trúc rất nông, lùi 3 cấp là đủ)
+                parent_element = link.locator("xpath=../../..") 
                 try:
                     text_content = parent_element.inner_text().strip()
                 except:
                     continue
                 
-                if text_content and len(text_content) > 100 and text_content not in seen_texts:
+                if text_content and len(text_content) > 50 and text_content not in seen_texts:
                     seen_texts.add(text_content)
-                    full_link = href if href.startswith("http") else "https://www.facebook.com" + href
+                    
+                    # Trả lại link dạng "www" để sinh viên bấm vào xem cho đẹp
+                    full_link = "https://www.facebook.com" + href.replace("mbasic.facebook.com", "")
+                    
                     posts_data.append({
                         "page_url": page_url,
                         "text": text_content,
-                        "link": full_link.split('?')[0] # Cắt bỏ phần tracking rườm rà
+                        "link": full_link
                     })
                 
                 if len(posts_data) >= 3:
