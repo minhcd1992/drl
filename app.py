@@ -166,13 +166,13 @@ with tab1:
                         # MẸO SỐNG CÒN: Nghỉ 4.5 giây giữa mỗi lần hỏi AI để tránh bị Google khóa do quá tải (15 request/phút)
                         time.sleep(4.5)
                 
-                with st.expander("🛠️ Chẩn đoán AI (Bấm vào để xem AI đang nghĩ gì)"):
-                    for url, log in debug_logs.items():
-                        st.markdown(f"**📍 Nguồn:** `{url}` ({log['log']})")
-                        for idx, p in enumerate(log["posts"]):
-                            st.markdown(f"> **Bài {idx+1} ({p['ngày']}):** {p['text_trích_đoạn']}")
-                            st.markdown(f"> **🤖 AI Trả lời:** `{p['phán_quyết_của_AI']}`")
-                        st.divider()
+               # with st.expander("🛠️ Chẩn đoán AI (Bấm vào để xem AI đang nghĩ gì)"):
+               #     for url, log in debug_logs.items():
+               #         st.markdown(f"**📍 Nguồn:** `{url}` ({log['log']})")
+               #         for idx, p in enumerate(log["posts"]):
+               #             st.markdown(f"> **Bài {idx+1} ({p['ngày']}):** {p['text_trích_đoạn']}")
+               #             st.markdown(f"> **🤖 AI Trả lời:** `{p['phán_quyết_của_AI']}`")
+               #        st.divider()
 
                 if len(all_found_posts) > 0:
                     st.success(f"Ting ting! Tìm thấy {len(all_found_posts)} sự kiện nóng hổi trong {days_to_scan} ngày qua!")
