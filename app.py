@@ -110,11 +110,18 @@ st.title("⚡ TRUNG TÂM KIỂM SOÁT ĐIỂM RÈN LUYỆN")
 
 tab1, tab2 = st.tabs(["📡 Radar Quét Sự Kiện", "🎯 Bảng Theo Dõi Cá Nhân"])
 
+# ==========================================
+# TAB 1: RADAR QUÉT SỰ KIỆN (Dùng Python)
+# ==========================================
 with tab1:
     st.info("Radar sử dụng AI Gemini để đọc hiểu và lọc các sự kiện có điểm rèn luyện.")
     
+    # Dòng ghi chú nhắc nhở tinh tế
+    st.markdown("💡 **Mẹo nhỏ:** Bạn hãy lưu sẵn các link Fanpage quan tâm vào app Ghi chú (Note) hoặc Zalo Truyền file, khi nào cần quét điểm chỉ việc Copy & Paste vào đây cho lẹ nhé!")
+    
     user_urls = st.text_area("Dán link Fanpage (mỗi link 1 dòng):", 
-                             "https://www.facebook.com/DoanHoiVatLyHCMUE\nhttps://www.facebook.com/TuoiTreHCMUE")
+                             "https://www.facebook.com/DoanHoiVatLyHCMUE\nhttps://www.facebook.com/TuoiTreHCMUE", 
+                             height=100)
     
     if st.button("🚀 Kích hoạt Radar", type="primary"):
         urls = [url.strip() for url in user_urls.split('\n') if url.strip()]
@@ -141,11 +148,8 @@ with tab1:
                 for idx, post in enumerate(all_found_posts):
                     with st.container(border=True):
                         st.subheader(f"🔥 {post['title']}")
-                        # Lấy đoạn đầu bài viết làm mô tả
                         st.write(post['text'][:200] + "...")
-                        # ĐÂY LÀ NÚT CHỨA LINK GỐC
                         st.link_button("Đến bài viết gốc trên Facebook ➡️", post['link'])
-
 with tab2:
     try:
         with open("tracker.html", "r", encoding="utf-8") as f:
