@@ -51,12 +51,14 @@ def fetch_facebook_posts(page_url):
     mobile_url = page_url.replace("www.facebook.com", "m.facebook.com")
     
     with sync_playwright() as p:
-        # THÊM ARGS ĐỂ CHROMIUM CÓ THỂ CHẠY TRONG DOCKER CỦA STREAMLIT
+        # ÉP XÀI CHROMIUM CỦA HỆ THỐNG
         browser = p.chromium.launch(
+            executable_path="/usr/bin/chromium", # Chỉ định đường dẫn tới Chromium cài từ packages.txt
             headless=True,
             args=[
                 "--no-sandbox",
-                "--disable-dev-shm-usage"
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
             ]
         )
         context = browser.new_context(
