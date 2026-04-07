@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Điểm Rèn Luyện Tracker V4</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap');
+  
+  :root {
+    --g1: #00e5ff; --g2: #7c4dff; --g3: #ff4081; --g4: #69f0ae; --g-warn: #ffd740;
+    --bg-dark: #161b26; --bg-card: #1f2937; --bg-card2: #374151; 
+    --text-main: #f3f4f6; --text-muted: #9ca3af;
+    --text-glow: 0 0 10px rgba(0,229,255,0.7);
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body, #app { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding: 20px 16px; position: relative; overflow-x: hidden; }
+  #app::before { content:''; position:fixed; top:0;left:0;right:0;bottom:0; background: radial-gradient(ellipse at 20% 20%, rgba(124,77,255,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(0,229,255,0.1) 0%, transparent 60%); pointer-events:none; z-index:0; }
+  
+  .rel { position: relative; z-index: 1; max-width: 650px; margin: 0 auto; }
+  h1.title { font-family: 'Orbitron', monospace; font-size: 24px; font-weight: 900; text-align: center; letter-spacing: 2px; color: var(--g1); text-shadow: var(--text-glow); margin-bottom: 8px; }
+  .subtitle { text-align:center; font-size: 13px; font-weight: 500; color: var(--text-muted); letter-spacing: 1px; margin-bottom: 24px; text-transform: uppercase; }
+  
+  .top-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .stat-box { background: var(--bg-card); border: 1px solid rgba(0,229,255,0.3); border-radius: 12px; padding: 16px 10px; text-align: center; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+  .stat-box::before { content:''; position:absolute; top:0;left:0;right:0;height:3px; background: linear-gradient(90deg, transparent, var(--g1), transparent); }
+  .stat-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+  .stat-val { font-family: 'Orbitron', monospace; font-size: 26px; font-weight: 700; color: var(--g1); text-shadow: var(--text-glow); }
+  
+  .overall-progress { background: var(--bg-card); border: 1px solid rgba(0,229,255,0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .prog-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 14px; font-weight: 600; letter-spacing: 1px; }
+  .prog-track { height: 24px; background: rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,0.05); }
+  .prog-fill { height: 100%; border-radius: 12px; position: relative; transition: width 0.8s ease; }
+  .prog-pct { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:13px; font-weight:700; mix-blend-mode: difference; color:#fff; font-family:'Orbitron',monospace; }
+  
+  .rank-bar { display: flex; justify-content: space-between; margin-top: 16px; flex-wrap: wrap; gap: 6px; }
+  .rank-item { text-align: center; flex: 1; min-width: 50px; }
+  .rank-dot { width: 14px; height: 14px; border-radius: 50%; margin: 0 auto 6px; border: 2px solid var(--bg-card); transition: all 0.3s; }
+  .rank-name { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+  .rank-threshold { font-size: 11px; color: rgba(224,224,255,0.4); font-family: 'Orbitron',monospace; font-weight: 700;}
+  .rank-active .rank-dot { box-shadow: 0 0 12px currentColor; transform: scale(1.3); }
+  .rank-active .rank-name { color: #fff; font-weight: 700; }
+  .rank-active .rank-threshold { color: var(--g1); }
+
+  .section-card { background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; cursor: pointer; background: var(--bg-card2); border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s; }
+  .section-header:hover { background: rgba(0,229,255,0.08); }
+  
+  .sec-left { display: flex; align-items: center; gap: 14px; flex: 1; }
+  .sec-icon { font-size: 24px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 10px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); }
+  .sec-name { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.3; margin-bottom: 4px; }
+  .sec-pts { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  
+  .sec-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; text-align: right; }
+  .sec-score { font-family: 'Orbitron', monospace; font-size: 18px; font-weight: 700; text-shadow: 0 0 5px currentColor; }
+  .sec-max { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+  .sec-bar { width: 60px; height: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; overflow: hidden; }
+  .sec-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+  .chevron { font-size: 14px; color: var(--text-muted); transition: transform 0.3s; margin-left: 4px; }
+  
+  .section-body { display: none; padding: 8px 16px 16px; background: rgba(0,0,0,0.15); }
+  .section-body.open { display: block; }
+  
+  .item-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .item-row.penalty { background: rgba(255,64,129,0.05); border-left: 3px solid var(--g3); padding-left: 12px; border-radius: 4px; }
+  .item-row:last-child { border-bottom: none; }
+  
+  .item-check { width: 24px; height: 24px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.2); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .item-check:hover { border-color: var(--g4); }
+  .item-check.checked { border-color: var(--g4); background: rgba(105,240,174,0.2); }
+  .item-check.checked::after { content: '✓'; font-size: 14px; color: var(--g4); font-weight: 900; }
+  
+  .item-content { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 6px; }
+  .item-name { font-size: 13px; color: #e5e7eb; line-height: 1.5; font-weight: 500; }
+  .item-name.penalty-text { color: #ff8a80; }
+  
+  .item-controls { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+  
+  .proof-btn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: var(--text-muted); }
+  .proof-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.4); }
+  
+  .custom-select { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: var(--g1); font-family: 'Orbitron',monospace; font-size: 14px; font-weight: 700; padding: 6px; cursor: pointer; outline: none; transition: border-color 0.2s; }
+  .custom-select:focus { border-color: var(--g1); box-shadow: 0 0 8px rgba(0,229,255,0.3); }
+  .custom-select.penalty-input { color: var(--g3); }
+  .custom-select option { background: var(--bg-card); color: #fff; font-family: 'Inter', sans-serif; }
+  
+  .item-max { font-size: 12px; color: var(--text-muted); font-weight: 600; font-family:'Orbitron',monospace; white-space: nowrap; }
+
+  /* Gallery Styles */
+  .gallery-container { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .thumb-wrap { position: relative; width: 48px; height: 48px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); overflow: hidden; cursor: pointer; transition: transform 0.2s; }
+  .thumb-wrap:hover { transform: scale(1.05); border-color: var(--g1); }
+  .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .delete-thumb { position: absolute; top: 0; right: 0; background: rgba(255,64,129,0.9); color: white; width: 16px; height: 16px; font-size: 10px; display: flex; align-items: center; justify-content: center; border-bottom-left-radius: 4px; cursor: pointer; }
+  .delete-thumb:hover { background: #ff1744; }
+
+  /* Modal Styles */
+  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
+  .modal.active { display: flex; }
+  .modal-content { max-width: 100%; max-height: 90vh; border-radius: 8px; border: 2px solid var(--g1); box-shadow: 0 0 20px rgba(0,229,255,0.3); }
+  .modal-close { position: absolute; top: 20px; right: 20px; font-size: 30px; color: white; cursor: pointer; text-shadow: 0 0 10px rgba(255,255,255,0.5); }
+  
+  .save-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, rgba(0,229,255,0.2), rgba(124,77,255,0.2)); border: 2px solid rgba(0,229,255,0.5); border-radius: 12px; color: #fff; font-family: 'Orbitron',monospace; font-size: 16px; font-weight: 700; letter-spacing: 2px; cursor: pointer; transition: all 0.3s; margin-top: 16px; margin-bottom: 40px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+  .save-btn:hover { background: linear-gradient(135deg, rgba(0,229,255,0.3), rgba(124,77,255,0.3)); box-shadow: 0 0 20px rgba(0,229,255,0.3); transform: translateY(-2px); }
+  
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--g4); color: #0d2a1a; padding: 14px 28px; border-radius: 30px; font-family: 'Orbitron',monospace; font-size: 14px; font-weight: 900; letter-spacing: 1px; opacity: 0; transition: all 0.3s; z-index: 999; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="rel">
+    <h1 class="title">⚡ ĐIỂM RÈN LUYỆN TRACKER</h1>
+    <div class="subtitle">ĐH Sư Phạm TP.HCM (HCMUE) · K51 Sư Phạm Vật Lý</div>
+
+    <div class="top-bar" id="topBar"></div>
+    <div class="overall-progress" id="overallProg"></div>
+    <div class="rank-bar" id="rankBar"></div>
+    
+    <div style="margin: 24px 0 16px; font-family:'Orbitron',monospace; font-size:14px; color:var(--g1); letter-spacing:1px; font-weight:700;">
+      ▼ BẢNG ĐÁNH GIÁ CHI TIẾT
+    </div>
+
+    <div id="criteria-container"></div>
+
+    <button class="save-btn" id="saveBtn">💾 LƯU TIẾN ĐỘ & MINH CHỨNG</button>
+  </div>
+  <div class="toast" id="toast">ĐÃ LƯU THÀNH CÔNG!</div>
+</div>
+
+<div class="modal" id="imageModal">
+  <span class="modal-close" onclick="closeModal()">&times;</span>
+  <img class="modal-content" id="modalImage">
+</div>
+
+<script>
+// DATA STRUCTURE WITH STEP FOR SELECT OPTIONS
+const DATA = {
+  sections: [
+    {
+      id: 'I', name: 'Đánh giá ý thức tham gia học tập', icon: '📚', color: '#00e5ff', max: 20,
+      items: [
+        { id:'I_a1', name:'Vào lớp học đúng giờ, tham gia các giờ đầy đủ', max: 1.5, type: 'check' },
+        { id:'I_a2', name:'Chuẩn bị bài tốt, ý thức nghiêm túc', max: 1.5, type: 'check' },
+        { id:'I_b1', name:'Tham gia hội thảo, tọa đàm... (3đ/hđ)', max: 15, type: 'select', step: 3, proof: true },
+        { id:'I_b2', name:'Tham gia HĐ NCKH, bài báo... (5đ/nc)', max: 15, type: 'select', step: 5, proof: true },
+        { id:'I_c1', name:'Tham gia cố vấn kỳ thi học thuật (1đ/hđ)', max: 5, type: 'select', step: 1, proof: true },
+        { id:'I_c2', name:'Cuộc thi học thuật Cấp Khoa (3đ/hđ)', max: 9, type: 'select', step: 3, proof: true },
+        { id:'I_c3', name:'Cuộc thi học thuật Cấp Trường (4đ/hđ)', max: 12, type: 'select', step: 4, proof: true },
+        { id:'I_c4', name:'Cuộc thi học thuật Cấp Tỉnh/TP (5đ/hđ)', max: 10, type: 'select', step: 5, proof: true },
+        { id:'I_d',  name:'Kết quả học tập của học kỳ đạt', max: 10, type: 'select', step: 1 },
+        { id:'I_e',  name:'Tinh thần vượt khó, phấn đấu', max: 3, type: 'select', step: 1 },
+        { id:'I_f1', name:'Khen thưởng học thuật Cấp Khoa (3đ/tt)', max: 6, type: 'select', step: 3, proof: true },
+        { id:'I_f2', name:'Khen thưởng học thuật Cấp Trường (4đ/tt)', max: 8, type: 'select', step: 4, proof: true },
+        { id:'I_f3', name:'Khen thưởng học thuật Cấp Tỉnh/TP (5đ/tt)', max: 10, type: 'select', step: 5, proof: true },
+        { id:'I_g1', name:'Không thực hiện bài khảo sát (-3đ/lần)', max: 15, type: 'penalty', step: 3 },
+        { id:'I_g2', name:'Vi phạm quy chế thi (Khiển trách đến Đình chỉ)', max: 16, type: 'penalty', step: 2 }
+      ]
+    },
+    {
+      id: 'II', name: 'Ý thức chấp hành nội quy, quy chế', icon: '📋', color: '#7c4dff', max: 25,
+      items: [
+        { id:'II_a1', name:'Không vi phạm quy chế', max: 2, type: 'check' },
+        { id:'II_a2', name:'Chấp hành quy định nội trú/ngoại trú', max: 3, type: 'select', step: 3 },
+        { id:'II_a3', name:'Chấp hành quy định BHYT', max: 2, type: 'check', proof: true },
+        { id:'II_a4', name:'Đóng học phí đúng hạn', max: 3, type: 'check' },
+        { id:'II_b',  name:'Đạt điểm Tuần Sinh hoạt công dân', max: 10, type: 'check' },
+        { id:'II_c1', name:'Đánh giá đúng tiến độ quy định', max: 2, type: 'check' },
+        { id:'II_d',  name:'Tham gia sinh hoạt lớp định kỳ', max: 5, type: 'select', step: 1 },
+        { id:'II_a5', name:'Vi phạm nội quy học đường (-3đ/lần)', max: 15, type: 'penalty', step: 3 },
+        { id:'II_a6', name:'Đăng ký "Cấp Khoa/Trường" không tham gia (-4đ/lần)', max: 12, type: 'penalty', step: 4 },
+        { id:'II_a7', name:'Sai quy định thời hạn hồ sơ (-3đ/lần)', max: 9, type: 'penalty', step: 3 },
+        { id:'II_a8', name:'Bị xử lý kỷ luật (-5 đến -10đ)', max: 20, type: 'penalty', step: 5 },
+        { id:'II_c2', name:'Đánh giá chậm tiến độ (-3đ)', max: 3, type: 'penalty', step: 3 }
+      ]
+    },
+    {
+      id: 'III', name: 'Hoạt động đoàn thể, CT, XH, VHVN', icon: '🏛️', color: '#ff4081', max: 20,
+      items: [
+        { id:'III_a1', name:'Thành viên CLB (3đ/CLB)', max: 9, type: 'select', step: 3, proof: true },
+        { id:'III_a2', name:'Tham gia cổ vũ HĐ (2đ/hđ)', max: 8, type: 'select', step: 2, proof: true },
+        { id:'III_a3', name:'Tham gia đại hội, tọa đàm CTXH (4đ/hđ)', max: 12, type: 'select', step: 4, proof: true },
+        { id:'III_b1', name:'HĐ VHVN, TDTT Cấp Lớp (1đ/hđ)', max: 5, type: 'select', step: 1, proof: true },
+        { id:'III_b2', name:'HĐ VHVN, TDTT Cấp Khoa (2đ/hđ)', max: 6, type: 'select', step: 2, proof: true },
+        { id:'III_b3', name:'HĐ VHVN, TDTT Cấp Trường (3đ/hđ)', max: 9, type: 'select', step: 3, proof: true },
+        { id:'III_c',  name:'Hiến máu, công ích, XH (3đ/hđ)', max: 9, type: 'select', step: 3, proof: true },
+        { id:'III_d',  name:'Tuyên truyền phòng chống TNXH (3đ/hđ)', max: 9, type: 'select', step: 3, proof: true },
+        { id:'III_e',  name:'Sinh viên được kết nạp Đoàn (2đ)', max: 2, type: 'check' },
+        { id:'III_f',  name:'Sinh viên được kết nạp Đảng (3đ)', max: 3, type: 'check' },
+        { id:'III_g1', name:'Khen thưởng Đoàn/VHVN Cấp Khoa (3đ/tt)', max: 6, type: 'select', step: 3, proof: true },
+        { id:'III_g2', name:'Khen thưởng Cấp Trường (4đ/tt)', max: 8, type: 'select', step: 4, proof: true },
+        { id:'III_g3', name:'Khen thưởng Cấp Tỉnh/TW (6đ/tt)', max: 12, type: 'select', step: 6, proof: true },
+        { id:'III_a4', name:'Không tham gia khi triệu tập (-4đ/hđ)', max: 12, type: 'penalty', step: 4 }
+      ]
+    },
+    {
+      id: 'IV', name: 'Ý thức công dân, cộng đồng', icon: '🤝', color: '#69f0ae', max: 25,
+      items: [
+        { id:'IV_a1', name:'Chấp hành chủ trương của Đảng...', max: 2.5, type: 'check' },
+        { id:'IV_a2', name:'Hưởng ứng các buổi học tập CT...', max: 2.5, type: 'check' },
+        { id:'IV_b1', name:'Tình nguyện vì cộng đồng Cấp Lớp (2đ/hđ)', max: 6, type: 'select', step: 2, proof: true },
+        { id:'IV_b2', name:'Tình nguyện Cấp Khoa (3đ/hđ)', max: 9, type: 'select', step: 3, proof: true },
+        { id:'IV_b3', name:'Tình nguyện Cấp Trường (4đ/hđ)', max: 12, type: 'select', step: 4, proof: true },
+        { id:'IV_c1', name:'Khen thưởng vì cộng đồng Cấp Khoa (3đ/tt)', max: 6, type: 'select', step: 3, proof: true },
+        { id:'IV_c2', name:'Khen thưởng Cấp Trường (4đ/tt)', max: 8, type: 'select', step: 4, proof: true },
+        { id:'IV_c3', name:'Khen thưởng Cấp Tỉnh/TW (6đ/tt)', max: 12, type: 'select', step: 6, proof: true }
+      ]
+    },
+    {
+      id: 'V', name: 'Phụ trách lớp, đoàn thể, thành tích', icon: '🎖️', color: '#ffd740', max: 10,
+      items: [
+        { id:'V_a',  name:'Hỗ trợ tích cực hoạt động chung của lớp', max: 3, type: 'check' },
+        { id:'V_b',  name:'Hoàn thành chức vụ (BCS, BCH, CN CLB...)', max: 10, type: 'select', step: 2 },
+        { id:'V_c1', name:'Danh hiệu "Sinh viên 5 tốt"', max: 10, type: 'select', step: 10, proof: true },
+        { id:'V_c2', name:'Giấy khen xuất sắc công tác Đoàn-Hội', max: 10, type: 'select', step: 10, proof: true },
+        { id:'V_c3', name:'Đạt giải I, II, III Giải thưởng NCKH', max: 10, type: 'select', step: 10, proof: true },
+        { id:'V_c4', name:'Thanh niên tiên tiến làm theo lời Bác', max: 4, type: 'check', proof: true },
+        { id:'V_c5', name:'Danh hiệu "Sao Tháng Giêng"', max: 7, type: 'check', proof: true },
+        { id:'V_c6', name:'Các khen thưởng cấp TW, NCKH khác', max: 6, type: 'check', proof: true }
+      ]
+    }
+  ],
+  ranks: [
+    { name: 'Xuất sắc', min: 90, color: '#ffd740' },
+    { name: 'Tốt', min: 80, color: '#69f0ae' },
+    { name: 'Khá', min: 65, color: '#00e5ff' },
+    { name: 'Trung bình', min: 50, color: '#7c4dff' },
+    { name: 'Yếu', min: 0, color: '#ff4081' },
+  ]
+};
+
+let scores = {};
+let proofs = {}; // Dạng: { "id_item": ["base64_1", "base64_2"] }
+const STORAGE_KEY = 'drl_hcmue_v4';
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      scores = data.scores || {};
+      proofs = data.proofs || {};
+    }
+  } catch(e) {}
+}
+
+function saveData() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ scores, proofs })); } catch(e) {}
+  const t = document.getElementById('toast');
+  t.innerText = "ĐÃ LƯU THÀNH CÔNG!";
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.innerText = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function getSectionScore(sec) {
+  let total = 0;
+  sec.items.forEach(it => {
+    let val = scores[it.id] || 0;
+    if (it.type === 'penalty') total -= val;
+    else total += val;
+  });
+  return Math.max(0, Math.min(total, sec.max));
+}
+
+function getTotal() { return DATA.sections.reduce((s, sec) => s + getSectionScore(sec), 0); }
+function getTotalMax() { return DATA.sections.reduce((s, sec) => s + sec.max, 0); }
+function getRank(score) {
+  for (const r of DATA.ranks) if (score >= r.min) return r;
+  return DATA.ranks[DATA.ranks.length - 1];
+}
+
+function renderUI() {
+  const total = getTotal();
+  const max = getTotalMax();
+  const rank = getRank(total);
+  const pct = Math.round(total / max * 100);
+
+  // Top Bar
+  document.getElementById('topBar').innerHTML = `
+    <div class="stat-box"><div class="stat-label">Tổng điểm</div><div class="stat-val">${total}</div></div>
+    <div class="stat-box"><div class="stat-label">Xếp loại</div><div class="stat-val" style="font-size:16px;color:${rank.color};text-shadow:0 0 10px ${rank.color}88;line-height:1.6;">${rank.name.toUpperCase()}</div></div>
+    <div class="stat-box"><div class="stat-label">Tiến độ</div><div class="stat-val">${pct}%</div></div>
+  `;
+
+  document.getElementById('overallProg').innerHTML = `
+    <div class="prog-label"><span style="font-family:'Orbitron',monospace;color:var(--text-muted);">TỔNG TIẾN ĐỘ</span><span style="font-family:'Orbitron',monospace;color:${rank.color};">${total} / ${max}</span></div>
+    <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:linear-gradient(90deg,${rank.color}99,${rank.color});"><span class="prog-pct">${pct}%</span></div></div>
+  `;
+
+  document.getElementById('rankBar').innerHTML = [...DATA.ranks].reverse().map(r => {
+    const isCurrent = r === rank;
+    return `<div class="rank-item ${isCurrent?'rank-active':''}"><div class="rank-dot" style="background:${r.color};color:${r.color};"></div><div class="rank-name">${r.name}</div><div class="rank-threshold">${r.min}+</div></div>`;
+  }).join('');
+
+  // Criteria List
+  document.getElementById('criteria-container').innerHTML = DATA.sections.map(sec => {
+    const secScore = getSectionScore(sec);
+    const secPct = Math.round(secScore / sec.max * 100);
+    
+    const itemsHtml = sec.items.map(it => {
+      const val = scores[it.id] || 0;
+      const proofArr = proofs[it.id] || [];
+      const hasProof = proofArr.length > 0;
+      const isPenalty = it.type === 'penalty';
+
+      // Tạo nút upload
+      let proofBtn = '';
+      if (it.proof) {
+        const remaining = 5 - proofArr.length;
+        proofBtn = `
+          <button class="proof-btn" onclick="triggerUpload('${it.id}')" title="Tải minh chứng">
+            📁 Thêm MC (${proofArr.length}/5)
+          </button>
+          <input type="file" id="file-${it.id}" style="display:none" accept="image/*" onchange="handleProof(event, '${it.id}')">
+        `;
+      }
+
+      // Render Gallery (Minh chứng đã tải lên)
+      let galleryHtml = '';
+      if (hasProof) {
+        const thumbs = proofArr.map((base64Str, index) => `
+          <div class="thumb-wrap" onclick="viewImage('${it.id}', ${index})">
+            <img src="${base64Str}">
+            <div class="delete-thumb" onclick="deleteProof(event, '${it.id}', ${index})">✕</div>
+          </div>
+        `).join('');
+        galleryHtml = `<div class="gallery-container">${thumbs}</div>`;
+      }
+
+      // Render Control (Check / Select)
+      let controlHtml = '';
+      if (it.type === 'check') {
+        const cBoxChecked = (val >= it.max);
+        controlHtml = `
+          <div class="item-check ${cBoxChecked?'checked':''}" onclick="toggleCheck('${it.id}', ${it.max})"></div>
+          <div style="font-family:'Orbitron',monospace;font-size:15px;color:${sec.color};width:20px;text-align:right;font-weight:700;">${val}</div>
+        `;
+      } else {
+        // Sinh options tự động cho Select
+        let options = '';
+        for(let i = 0; i <= it.max; i += (it.step || 1)) {
+          let displayVal = isPenalty ? (i === 0 ? '0' : `-${i}`) : i;
+          let selected = val === i ? 'selected' : '';
+          options += `<option value="${i}" ${selected}>${displayVal}</option>`;
+        }
+        // Fix trường hợp step không chẵn với max (ví dụ 2.5)
+        if(it.max % (it.step || 1) !== 0 && val === it.max) {
+           options += `<option value="${it.max}" selected>${isPenalty?'-':''}${it.max}</option>`;
+        }
+
+        controlHtml = `
+          <select class="custom-select ${isPenalty?'penalty-input':''}" onchange="updateScore('${it.id}', this.value)">
+            ${options}
+          </select>
+        `;
+      }
+
+      return `
+        <div class="item-row ${isPenalty?'penalty':''}">
+          <div class="item-content">
+            <div class="item-name ${isPenalty?'penalty-text':''}">${it.name}</div>
+            <div style="display:flex;gap:8px;">${proofBtn}</div>
+            ${galleryHtml}
+          </div>
+          <div class="item-controls">
+            ${controlHtml}
+            <span class="item-max">/ ${isPenalty?'-':''}${it.max}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection('${sec.id}')">
+          <div class="sec-left">
+            <div class="sec-icon" style="background:${sec.color}15; color:${sec.color};">${sec.icon}</div>
+            <div class="sec-name">${sec.name}</div>
+          </div>
+          <div class="sec-right">
+            <div><span class="sec-score" style="color:${sec.color}">${secScore}</span><span class="sec-max">/ ${sec.max}</span></div>
+            <div class="chevron" id="chev-${sec.id}">▼</div>
+          </div>
+        </div>
+        <div class="section-body" id="body-${sec.id}">${itemsHtml}</div>
+      </div>`;
+  }).join('');
+
+  restoreOpenSections();
+}
+
+// ---- INTERACTION LOGIC ----
+function toggleCheck(id, max) { scores[id] = (scores[id] >= max) ? 0 : max; renderUI(); }
+function updateScore(id, val) { scores[id] = parseFloat(val) || 0; renderUI(); }
+
+// ---- IMAGE PROCESSING (CANVAS COMPRESSION) ----
+function triggerUpload(id) { document.getElementById('file-' + id).click(); }
+
+function handleProof(event, id) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  if (!proofs[id]) proofs[id] = [];
+  if (proofs[id].length >= 5) {
+    showToast("⚠️ Tối đa 5 minh chứng cho mục này!");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      // Nén ảnh bằng Canvas để tránh tràn bộ nhớ LocalStorage
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 800; // Giảm độ phân giải
+      const MAX_HEIGHT = 800;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+      } else {
+        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Nén JPEG chất lượng 60%
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      proofs[id].push(dataUrl);
+      
+      saveData(); // Lưu ngay lập tức
+      renderUI(); // Cập nhật giao diện
+    }
+    img.src = e.target.result;
+  }
+  reader.readAsDataURL(file);
+}
+
+function deleteProof(e, id, index) {
+  e.stopPropagation(); // Ngăn sự kiện click lan ra (không mở ảnh to)
+  if (confirm("Xóa minh chứng này?")) {
+    proofs[id].splice(index, 1);
+    saveData();
+    renderUI();
+  }
+}
+
+// Modal View
+function viewImage(id, index) {
+  const modal = document.getElementById('imageModal');
+  const modalImg = document.getElementById('modalImage');
+  modalImg.src = proofs[id][index];
+  modal.classList.add('active');
+}
+function closeModal() { document.getElementById('imageModal').classList.remove('active'); }
+
+// UI Accordion
+let openSections = new Set(['I']);
+function toggleSection(id) {
+  if (openSections.has(id)) openSections.delete(id);
+  else openSections.add(id);
+  
+  const body = document.getElementById('body-'+id);
+  const chev = document.getElementById('chev-'+id);
+  if(body) {
+    body.classList.toggle('open');
+    chev.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+  }
+}
+function restoreOpenSections() {
+  openSections.forEach(id => {
+    const body = document.getElementById('body-'+id);
+    const chev = document.getElementById('chev-'+id);
+    if (body) { body.classList.add('open'); chev.style.transform = 'rotate(180deg)'; }
+  });
+}
+
+document.getElementById('saveBtn').addEventListener('click', saveData);
+
+// Init
+loadData();
+renderUI();
+</script>
+</body>
+</html>
