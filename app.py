@@ -15,27 +15,43 @@ APIFY_TOKEN = st.secrets.get("APIFY_TOKEN", "")
 genai.configure(api_key=GEMINI_KEY)
 
 def analyze_post_with_ai(text):
-    """Hàm gọi Gemini AI để nhận diện bài viết"""
+    """Hàm gọi Gemini AI để nhận diện bài viết với Prompt siêu cấp"""
     if not GEMINI_KEY:
          return False, "Lỗi", "CHƯA CẤU HÌNH GEMINI API KEY TRONG SECRETS!"
          
     try:
-        # SỬA LẠI TÊN MODEL Ở DÒNG NÀY THEO CHUẨN CỦA BẠN:
         model = genai.GenerativeModel('gemini-flash-latest')
         
+        # Mớm luật Điểm Rèn Luyện HCMUE cho AI
         prompt = f"""
-        Đọc đoạn văn bản sau cào từ Facebook Đoàn/Hội.
-        Đoạn này CÓ PHẢI là một sự kiện/thông báo tuyển tình nguyện viên/hội thảo mà sinh viên tham gia có thể lấy điểm rèn luyện không?
-        Chỉ trả lời 2 dòng:
-        Dòng 1: ĐÚNG hoặc SAI
-        Dòng 2: Tóm tắt tên sự kiện (nếu ĐÚNG), hoặc ghi 'Bỏ qua' (nếu SAI).
+        Bạn là chuyên gia phân tích dữ liệu cho sinh viên trường Đại học Sư Phạm TP.HCM (HCMUE). 
+        Nhiệm vụ của bạn là đọc bài đăng Facebook và xác định xem bài viết này CÓ ĐANG MỞ FORM ĐĂNG KÝ THAM GIA sự kiện để lấy "Điểm Rèn Luyện" hoặc "Ngày Tình Nguyện" hay không.
         
-        Nội dung:
-        "{text[:1000]}"
+        HÃY ĐÁNH GIÁ LÀ "ĐÚNG" NẾU BÀI VIẾT CÓ CÁC YẾU TỐ SAU (Dựa theo quy chế ĐRL):
+        1. Có các từ khóa kêu gọi: "Tuyển Cộng tác viên (CTV)", "Tuyển Tình nguyện viên (TNV)", "Đăng ký tham gia", "Ban tổ chức".
+        2. Có quyền lợi rõ ràng: "Giấy chứng nhận", "Quy đổi ngày tình nguyện", "Điểm rèn luyện", "Điểm CTXH".
+        3. Thuộc các nhóm sự kiện: Hội thảo, tọa đàm, cuộc thi học thuật, hiến máu, hội thao, văn nghệ, chiến dịch Mùa hè xanh, Xuân tình nguyện...
+        4. BẮT BUỘC phải có dấu hiệu đang mở đăng ký (như có Link điền form). Chú ý: Đừng bị lừa bởi các đoạn thơ hay lịch sử ở đầu bài.
+        
+        HÃY ĐÁNH GIÁ LÀ "SAI" VÀ LOẠI BỎ CÁC BÀI VIẾT SAU:
+        - Chúc mừng sinh nhật, kỷ niệm ngày lễ (ví dụ: Kỷ niệm ngày sinh, Chúc mừng 26/3...).
+        - Công bố kết quả minigame, kết quả cuộc thi, khen thưởng.
+        - Thông báo nghỉ học, nộp học phí, lịch thi, cảnh báo học vụ.
+        - Bài viết chia sẻ kiến thức, thơ ca thông thường mà không có link đăng ký tham gia sự kiện.
+        
+        Bài viết cần phân tích:
+        \"\"\"{text[:2000]}\"\"\"
+        
+        Trả lời theo định dạng nghiêm ngặt 2 dòng:
+        Dòng 1: ĐÚNG (nếu sinh viên có thể đăng ký tham gia sự kiện này) hoặc SAI (nếu không).
+        Dòng 2: Tóm tắt tên sự kiện thật ngắn gọn (nếu ĐÚNG) hoặc ghi "Bỏ qua" (nếu SAI).
         """
+        
         response = model.generate_content(prompt)
         ai_reply = response.text.strip()
-        result = ai_reply.split('\n')
+        
+        # Xử lý kết quả trả về, xóa các dòng trống nếu AI sinh dư
+        result = [r.strip() for r in ai_reply.split('\n') if r.strip()]
         
         is_drl = "ĐÚNG" in result[0].upper()
         title = result[1] if len(result) > 1 else "Sự kiện chưa có tên"
@@ -43,7 +59,6 @@ def analyze_post_with_ai(text):
         return is_drl, title, ai_reply
     except Exception as e:
         return False, "Lỗi AI", f"Lỗi gọi Gemini API: {str(e)}"
-
 def fetch_facebook_posts(page_url, days_limit=2):
     """Hàm cào bài viết bằng Apify và lọc theo thời gian (Bản Fix Lỗi Ngày)"""
     if not APIFY_TOKEN:
