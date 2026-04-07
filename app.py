@@ -143,7 +143,14 @@ with tab1:
                     for url, log in debug_logs.items():
                         st.markdown(f"**URL:** {url}")
                         st.markdown(f"**Số block bài viết bắt được:** {log['posts_found']}")
-                        st.text_area("Text thô mà Bot đọc được từ trang này:", log['raw_text'][:2000] + "...\n(Đã cắt bớt)", height=150)
+                        
+                        # THÊM key=url VÀO CUỐI DÒNG NÀY ĐỂ FIX LỖI
+                        st.text_area(
+                            "Text thô mà Bot đọc được từ trang này:", 
+                            log['raw_text'][:2000] + "...\n(Đã cắt bớt)", 
+                            height=150, 
+                            key=url  # <--- Bùa hộ mệnh ở đây
+                        )
                 # -------------------------------
 
                 if len(all_found_posts) > 0:
