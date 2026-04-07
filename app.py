@@ -20,7 +20,9 @@ def analyze_post_with_ai(text):
          return False, "Lỗi", "CHƯA CẤU HÌNH GEMINI API KEY TRONG SECRETS!"
          
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # SỬA LẠI TÊN MODEL Ở DÒNG NÀY THEO CHUẨN CỦA BẠN:
+        model = genai.GenerativeModel('gemini-flash-latest')
+        
         prompt = f"""
         Đọc đoạn văn bản sau cào từ Facebook Đoàn/Hội.
         Đoạn này CÓ PHẢI là một sự kiện/thông báo tuyển tình nguyện viên/hội thảo mà sinh viên tham gia có thể lấy điểm rèn luyện không?
